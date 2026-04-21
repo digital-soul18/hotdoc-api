@@ -137,8 +137,8 @@ async def book(req: BookRequest):
     except ValueError:
         raise HTTPException(status_code=422, detail="date must be YYYY-MM-DD")
 
-    # aria-label format: "9:15 am Friday 24 April"
-    aria_label = f"{req.time} {slot_dt.strftime('%A %-d %B')}"
+    # aria-label format: "2:15 pm Thursday May 7"  (month before day — HotDoc's format)
+    aria_label = f"{req.time} {slot_dt.strftime('%A %B %-d')}"
 
     appointment_id: int | None = None
 
@@ -221,14 +221,19 @@ async def book(req: BookRequest):
         await page.wait_for_timeout(1500)
         await page.wait_for_load_state("networkidle")
 
-        # Stipulations — answer "No"
-        for _ in range(3):
-            if "stipulation" in page.url or "symptom" in page.url:
+        # Step through any intermediate pages before the final review:
+        #   terms-and-conditions  → "I have read and agree"
+        #   stipulations / symptoms → "No"
+        for _ in range(6):
+            url = page.url
+            if "terms-and-conditions" in url:
+                await _click(page, ["I have read and agree"])
+            elif "stipulation" in url or "symptom" in url or "covid" in url.lower():
                 await _click(page, ["No"])
-                await page.wait_for_timeout(1000)
-                await page.wait_for_load_state("networkidle")
             else:
                 break
+            await page.wait_for_timeout(1000)
+            await page.wait_for_load_state("networkidle")
 
         # Review — confirm
         await _click(page, ["Yes, book", "Confirm", "Book appointment"])

@@ -230,7 +230,8 @@ async def book_slot(page: Page, slot: dict) -> int | None:
     """
     slot_dt = datetime.fromisoformat(slot["start_time"])
     # aria-label format on slot buttons: "9:15 am Friday 24 April" (no year, no comma)
-    aria_label = f"{slot['label']} {slot_dt.strftime('%A %-d %B')}"
+    # aria-label format: "2:15 pm Thursday May 7"  (month before day — HotDoc's format)
+    aria_label = f"{slot['label']} {slot_dt.strftime('%A %B %-d')}"
 
     print(f"\nBooking slot '{aria_label}'...")
 
@@ -308,14 +309,19 @@ async def book_slot(page: Page, slot: dict) -> int | None:
         await page.wait_for_timeout(1500)
         await page.wait_for_load_state("networkidle")
 
-        # Stipulations — answer "No" to COVID/symptom questions
-        for _ in range(3):
-            if "stipulation" in page.url or "symptom" in page.url:
+        # Step through any intermediate pages before the final review:
+        #   terms-and-conditions  → "I have read and agree"  (e.g. Dr Patel)
+        #   stipulations / symptoms → "No"                   (e.g. Nurse)
+        for _ in range(6):
+            url = page.url
+            if "terms-and-conditions" in url:
+                await _click(page, ["I have read and agree"])
+            elif "stipulation" in url or "symptom" in url or "covid" in url.lower():
                 await _click(page, ["No"])
-                await page.wait_for_timeout(1000)
-                await page.wait_for_load_state("networkidle")
             else:
                 break
+            await page.wait_for_timeout(1000)
+            await page.wait_for_load_state("networkidle")
 
         # Review — confirm booking
         await _click(page, ["Yes, book", "Confirm", "Book appointment"])
