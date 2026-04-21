@@ -1,18 +1,12 @@
-FROM python:3.11-slim
-
-# Install system dependencies required by Playwright/Chromium
-RUN apt-get update && apt-get install -y \
-    wget curl gnupg ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Official Playwright image — Ubuntu 22.04 (Jammy), Chromium pre-installed.
+# Avoids the broken --with-deps font packages on Debian Trixie.
+FROM mcr.microsoft.com/playwright/python:v1.49.0-jammy
 
 WORKDIR /app
 
-# Install Python dependencies first (layer cache)
+# Install Python dependencies (Playwright itself is already in the base image)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Install Chromium + its OS-level deps in one shot
-RUN playwright install chromium --with-deps
 
 # Copy application code
 COPY . .
